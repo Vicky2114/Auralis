@@ -54,11 +54,8 @@ jobs:
           node-version: "20"
           cache: npm
 
-      # Use `npm install`, not `npm ci`: npm ci skips platform-specific
-      # optional deps (rollup's native binary) when the lockfile was authored
-      # on another OS — npm/cli#4828. `npm install` resolves them correctly.
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Typecheck & build
         run: npm run build
