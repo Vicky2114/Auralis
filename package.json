@@ -1,0 +1,26 @@
+{
+  "name": "auralis",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Auralis — Pipecat + Gemini Live voice companion (monorepo: Python server + React client)",
+  "workspaces": [
+    "client"
+  ],
+  "scripts": {
+    "dev": "concurrently --kill-others-on-fail --names \"server,client\" --prefix-colors \"magenta.bold,cyan.bold\" \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "cd server && uv run python server.py",
+    "dev:client": "npm run dev --workspace client",
+    "build": "npm run build --workspace client",
+    "preview": "npm run preview --workspace client",
+    "setup": "npm install && npm run setup:server && npm run setup:env",
+    "setup:server": "cd server && uv sync",
+    "setup:env": "node scripts/setup-env.mjs",
+    "start": "npm run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

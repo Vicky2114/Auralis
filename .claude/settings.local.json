@@ -16,7 +16,8 @@
       "PowerShell($env:GIT_TERMINAL_PROMPT=0; $out = git ls-remote https://github.com/Vicky2114/Auralis.git 2>&1 | Out-String; \"EXIT=$LASTEXITCODE\"; \"OUT=[$out]\")",
       "PowerShell(git init)",
       "PowerShell(git branch -M main)",
-      "PowerShell(git add -A)"
+      "PowerShell(git add -A)",
+      "Bash(git rm *)"
     ]
   }
 }

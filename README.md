@@ -1,4 +1,4 @@
-# Aura — Pipecat + Gemini Live voice buddy
+# Auralis — Pipecat + Gemini Live voice buddy
 
 A daily-companion voice app: pick a persona (therapist, mentor, friend, coach,
 listener), talk to it in real time, and it learns about you across sessions.
@@ -7,8 +7,36 @@ Backend uses **Pipecat** with **Gemini Live** (native-audio dialog) plus
 aura orb that breathes, pulses with the bot's voice, and lights up when you
 speak.
 
+## Quick start (one command)
+
+This is an npm-workspaces monorepo — the root orchestrates both the Python
+server and the React client.
+
+```bash
+npm run setup     # installs client deps, runs `uv sync`, creates server/.env
+# → add your GOOGLE_API_KEY to server/.env
+npm run dev       # boots BOTH: server on :7860 + client on :5173
 ```
-Pipecat live/
+
+Open <http://localhost:5173>. That's it.
+
+| Command | What it does |
+|---|---|
+| `npm run setup` | One-time: client deps + `uv sync` + copies `.env.example` → `.env` |
+| `npm run dev` | Runs server + client together (via `concurrently`) |
+| `npm run dev:server` | Server only (`uv run python server.py`) |
+| `npm run dev:client` | Client only (Vite) |
+| `npm run build` | Production build of the client |
+
+> Requires [`uv`](https://docs.astral.sh/uv/) for the Python side and Node ≥ 18.
+> On Windows you can also just double-click `start.bat`.
+
+The manual two-terminal flow is still documented below if you prefer it.
+
+```
+Auralis/
+├── package.json   # monorepo root — `npm run dev` runs both sides
+├── scripts/       # setup-env.mjs (creates server/.env on first run)
 ├── server/        # FastAPI + Pipecat bot (Python 3.11+)
 │   ├── bot.py             # Pipecat pipeline w/ Gemini Live + tools
 │   ├── server.py          # WebRTC signaling + memory API

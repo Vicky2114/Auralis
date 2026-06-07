@@ -1,8 +1,6 @@
 @echo off
-REM Quick-start: launches backend and frontend in two windows.
-REM Backend uses `uv run` so it always finds the project's venv.
-REM Run `uv sync` inside server/ and `npm install` inside client/ first.
-
-start "aura-server" cmd /k "cd /d %~dp0server && uv run python server.py"
-start "aura-client" cmd /k "cd /d %~dp0client && npm run dev"
-echo Started both. Server -^> http://localhost:7860   Client -^> http://localhost:5173
+REM Auralis one-command launcher.
+REM First time only:  npm run setup   (installs client deps + uv sync + creates .env)
+REM Then add your GOOGLE_API_KEY to server\.env and run this file (or: npm run dev).
+cd /d %~dp0
+npm run dev
