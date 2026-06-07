@@ -33,7 +33,9 @@ from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
 import memory
 import personas
 
-load_dotenv()
+# override=True so the project's .env wins over any stray machine/user-level
+# env vars (e.g. a leftover GOOGLE_API_KEY in the OS environment shadowing it).
+load_dotenv(override=True)
 
 
 # --- Tool schemas ----------------------------------------------------------

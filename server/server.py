@@ -36,7 +36,9 @@ import bot as bot_module
 import memory
 import personas
 
-load_dotenv()
+# override=True so the project's .env wins over any stray machine/user-level
+# env vars (e.g. a leftover GOOGLE_API_KEY in the OS environment shadowing it).
+load_dotenv(override=True)
 
 
 webrtc_handler = SmallWebRTCRequestHandler(connection_mode=ConnectionMode.MULTIPLE)
