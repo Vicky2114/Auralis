@@ -129,6 +129,9 @@ export function useVoiceClient({ userId, personaId }: Options) {
           },
           onBotStartedSpeaking: () => {
             // First audio from the agent — the "preparing" phase is over.
+            // NOTE: Gemini Live over SmallWebRTC doesn't always emit this RTVI
+            // event, so readiness is ALSO flipped by real bot audio level and
+            // the first bot transcript below — whichever fires first.
             setAgentReady(true);
             setBotSpeaking(true);
           },
@@ -165,6 +168,9 @@ export function useVoiceClient({ userId, personaId }: Options) {
       });
       client.on(RTVIEvent.BotTranscript, (data: BotLLMTextData) => {
         if (!data.text) return;
+        // First bot message also ends the "preparing" phase (fallback in case
+        // the bot-started-speaking / audio-level events don't fire).
+        setAgentReady(true);
         // Bot transcripts often arrive as completed sentences, treat as final.
         appendOrUpdate("bot", data.text, true);
       });
@@ -174,7 +180,13 @@ export function useVoiceClient({ userId, personaId }: Options) {
       const anyClient = client as unknown as {
         on: (ev: string, cb: (lvl: number) => void) => void;
       };
-      anyClient.on("RemoteAudioLevel", (lvl) => setBotLevel(clamp01(lvl)));
+      anyClient.on("RemoteAudioLevel", (lvl) => {
+        const v = clamp01(lvl);
+        setBotLevel(v);
+        // Real audio energy from the agent == its first audio is playing.
+        // This is the truest "first audio" signal and the most reliable one.
+        if (v > 0.01) setAgentReady(true);
+      });
       anyClient.on("LocalAudioLevel", (lvl) => setUserLevel(clamp01(lvl)));
 
       clientRef.current = client;
