@@ -1,0 +1,22 @@
+[project]
+name = "aura-buddy-server"
+version = "0.1.0"
+description = "Pipecat + Gemini Live voice companion with per-user memory and Google Search."
+requires-python = ">=3.11,<3.14"
+license = { text = "MIT" }
+authors = [
+    { name = "Aura Buddy" },
+]
+dependencies = [
+    "pipecat-ai[google,silero,webrtc]>=0.0.90",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "python-dotenv>=1.0",
+    "loguru>=0.7",
+    "pydantic>=2.9",
+]
+
+# This is an application, not a library — uv resolves and installs deps but
+# doesn't try to build/install the project itself. Run with `python server.py`.
+[tool.uv]
+package = false

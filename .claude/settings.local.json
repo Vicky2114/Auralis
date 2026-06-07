@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv run *)",
+      "Bash(npm run *)",
+      "Bash(curl -s -o /dev/null -w \"backend http=%{http_code}\\\\n\" http://localhost:7860/)",
+      "Bash(curl -s -o /dev/null -w \"client http=%{http_code}\\\\n\" http://localhost:5173/)",
+      "mcp__Claude_in_Chrome__list_connected_browsers",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(curl -s http://localhost:7860/api/personas)",
+      "WebFetch(domain:ai.google.dev)",
+      "Bash(curl -sS -i http://localhost:7860/api/diag)",
+      "Bash(gh auth *)",
+      "PowerShell($g = \\(Get-Command git -ErrorAction SilentlyContinue\\); if\\($g\\){\"git: $\\($g.Source\\)\"}else{\"git: MISSING\"}; $h = \\(Get-Command gh -ErrorAction SilentlyContinue\\); if\\($h\\){\"gh: $\\($h.Source\\)\"}else{\"gh: MISSING\"}; \"name=\" + \\(git config --global user.name\\); \"email=\" + \\(git config --global user.email\\))",
+      "PowerShell($env:GIT_TERMINAL_PROMPT=0; git ls-remote https://github.com/Vicky2114/Auralis.git HEAD 2>&1 | Out-String)",
+      "PowerShell($env:GIT_TERMINAL_PROMPT=0; $out = git ls-remote https://github.com/Vicky2114/Auralis.git 2>&1 | Out-String; \"EXIT=$LASTEXITCODE\"; \"OUT=[$out]\")",
+      "PowerShell(git init)",
+      "PowerShell(git branch -M main)",
+      "PowerShell(git add -A)"
+    ]
+  }
+}

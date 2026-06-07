@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+
+# Node
+node_modules/
+client/dist/
+
+# Env
+.env
+**/.env
+
+# Memory store — keep the directory but ignore contents
+server/data/memory/*.json
+
+# Editor
+.vscode/
+.idea/
+*.swp
+.DS_Store
