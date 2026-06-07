@@ -7,6 +7,7 @@ interface Props {
   speaking: boolean;    // bot is currently speaking
   listening: boolean;   // user is currently speaking
   connected: boolean;
+  preparing?: boolean;  // connected, but agent hasn't spoken its first audio yet
   onTap?: () => void;   // single tap (no drag) — e.g. start/end session
   size?: "sm" | "lg";
 }
@@ -25,6 +26,7 @@ export default function AuraOrb({
   speaking,
   listening,
   connected,
+  preparing = false,
   onTap,
   size = "lg",
 }: Props) {
@@ -82,6 +84,7 @@ export default function AuraOrb({
         "aura",
         `aura--${size}`,
         connected ? "aura--connected" : "",
+        preparing ? "aura--preparing" : "",
         speaking ? "aura--speaking" : "",
         listening ? "aura--listening" : "",
         dragging ? "aura--dragging" : "",
@@ -113,6 +116,9 @@ export default function AuraOrb({
       {/* Expanding wave rings while speaking */}
       <div className="aura__wave aura__wave--a" />
       <div className="aura__wave aura__wave--b" />
+
+      {/* Rotating arc while the agent warms up (preparing) */}
+      <div className="aura__prepare-ring" />
 
       {/* Listener ring while user talks */}
       <div className="aura__listen-ring" />

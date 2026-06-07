@@ -28,6 +28,10 @@ export function useVoiceClient({ userId, personaId }: Options) {
   const [state, setState] = useState<ConnState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [thread, setThread] = useState<ThreadMessage[]>([]);
+  // True once the agent has produced its FIRST audio (first onBotStartedSpeaking).
+  // The transport reports "connected" several seconds before the model finishes
+  // warming up and speaks, so we use this to show a distinct "preparing" phase.
+  const [agentReady, setAgentReady] = useState(false);
   const [botSpeaking, setBotSpeaking] = useState(false);
   const [userSpeaking, setUserSpeaking] = useState(false);
   const [botLevel, setBotLevel] = useState(0); // 0..1, drives the orb
@@ -93,6 +97,7 @@ export function useVoiceClient({ userId, personaId }: Options) {
   const connect = useCallback(async () => {
     if (clientRef.current) return;
     setError(null);
+    setAgentReady(false);
     setState("connecting");
 
     try {
@@ -111,6 +116,7 @@ export function useVoiceClient({ userId, personaId }: Options) {
           onConnected: () => setState("connected"),
           onDisconnected: () => {
             setState("idle");
+            setAgentReady(false);
             setBotSpeaking(false);
             setUserSpeaking(false);
             setBotLevel(0);
@@ -121,7 +127,11 @@ export function useVoiceClient({ userId, personaId }: Options) {
             setError(typeof msg === "string" ? msg : JSON.stringify(msg));
             setState("error");
           },
-          onBotStartedSpeaking: () => setBotSpeaking(true),
+          onBotStartedSpeaking: () => {
+            // First audio from the agent — the "preparing" phase is over.
+            setAgentReady(true);
+            setBotSpeaking(true);
+          },
           onBotStoppedSpeaking: () => {
             setBotSpeaking(false);
             setBotLevel(0);
@@ -194,6 +204,7 @@ export function useVoiceClient({ userId, personaId }: Options) {
       audioElRef.current.remove();
       audioElRef.current = null;
     }
+    setAgentReady(false);
     setState("idle");
   }, []);
 
@@ -210,6 +221,7 @@ export function useVoiceClient({ userId, personaId }: Options) {
 
   return {
     state,
+    agentReady,
     error,
     thread,
     botSpeaking,

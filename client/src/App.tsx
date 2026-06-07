@@ -47,6 +47,7 @@ export default function App() {
 
   const {
     state,
+    agentReady,
     error,
     thread,
     botSpeaking,
@@ -60,6 +61,22 @@ export default function App() {
 
   const isConnected = state === "connected";
   const isBusy = state === "connecting";
+  // Transport is up but the agent hasn't spoken its first audio yet — the model
+  // is still warming up. Show a distinct "preparing" state so the gap between
+  // "connected" and the first greeting doesn't feel like a dead connection.
+  const isPreparing = isConnected && !agentReady;
+
+  // If preparing drags on (cold model / slow start), soften the message so it
+  // never looks frozen.
+  const [slowStart, setSlowStart] = useState(false);
+  useEffect(() => {
+    if (!isPreparing) {
+      setSlowStart(false);
+      return;
+    }
+    const t = setTimeout(() => setSlowStart(true), 18000);
+    return () => clearTimeout(t);
+  }, [isPreparing]);
 
   const handleEnd = async () => {
     await disconnect();
@@ -94,7 +111,7 @@ export default function App() {
 
       {/* Top-right status + drawer toggles */}
       <div className="overlay overlay--top-right">
-        <Status state={state} />
+        <Status state={state} preparing={isPreparing} />
         <div className="iconbar">
           <IconButton
             label="Buddy"
@@ -128,11 +145,16 @@ export default function App() {
           speaking={botSpeaking}
           listening={userSpeaking}
           connected={isConnected}
+          preparing={isPreparing}
           onTap={handleOrbTap}
         />
         <p className="ambient__hint">
           {isBusy
             ? "जुड़ रहा है… (Connecting…)"
+            : isPreparing
+            ? slowStart
+              ? `${persona.name} अभी भी तैयार हो रहा है… (still getting ready)`
+              : `${persona.name} तैयार हो रहा है… (getting ready)`
             : isConnected
             ? "बस बात करो — मैं सुन रहा हूँ"
             : "Tap the orb to talk"}
@@ -208,17 +230,20 @@ export default function App() {
   );
 }
 
-function Status({ state }: { state: string }) {
+function Status({ state, preparing }: { state: string; preparing?: boolean }) {
+  // "preparing" is a sub-state of connected — transport up, agent warming up.
+  const effective = preparing ? "preparing" : state;
   const labels: Record<string, string> = {
     idle: "Ready",
     connecting: "Connecting…",
+    preparing: "Preparing…",
     connected: "Live",
     error: "Error",
   };
   return (
-    <div className={`status status--${state}`}>
+    <div className={`status status--${effective}`}>
       <span className="status__dot" />
-      <span className="status__label">{labels[state] ?? state}</span>
+      <span className="status__label">{labels[effective] ?? effective}</span>
     </div>
   );
 }

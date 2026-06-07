@@ -194,6 +194,7 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
   background: var(--fg-dim);
 }
 .status--connecting .status__dot { background: #f59e0b; animation: pulse 1.2s infinite; }
+.status--preparing .status__dot { background: #38bdf8; box-shadow: 0 0 10px #38bdf8; animation: pulse 0.9s infinite; }
 .status--connected .status__dot { background: #22c55e; box-shadow: 0 0 10px #22c55e; }
 .status--error .status__dot { background: #ef4444; }
 @keyframes pulse {
@@ -325,6 +326,28 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
   50%      { transform: scale(1.025); }
 }
 .aura--connected .aura__core { animation-duration: 3s; }
+/* While preparing: a slightly quicker, anticipatory breathe. */
+.aura--preparing .aura__core { animation-duration: 1.6s; }
+
+/* Rotating arc that signals "the agent is warming up". Hidden unless preparing. */
+.aura__prepare-ring {
+  position: absolute;
+  inset: -6%;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: rgba(255, 255, 255, 0.9);
+  border-right-color: color-mix(in oklab, var(--accent) 70%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  filter: drop-shadow(0 0 8px color-mix(in oklab, var(--accent) 60%, transparent));
+}
+.aura--preparing .aura__prepare-ring {
+  opacity: 0.9;
+  animation: prepareSpin 1.1s linear infinite;
+}
+@keyframes prepareSpin {
+  to { transform: rotate(360deg); }
+}
 
 /* Wave rings while bot speaks */
 .aura__wave {
