@@ -13,7 +13,6 @@ class Persona:
     name: str
     tagline: str
     voice: str  # Gemini Live voice (Puck, Charon, Kore, Fenrir, Aoede, Leda, Orus, Zephyr)
-    voice_openai: str  # OpenAI Realtime voice (alloy, ash, ballad, coral, echo, sage, shimmer, verse, marin, cedar)
     accent: str  # hex color for the aura orb
     system_prompt: str
 
@@ -50,7 +49,6 @@ PERSONAS: dict[str, Persona] = {
         name="Aura",
         tagline="Daily therapist — calm, reflective, here to listen",
         voice="Aoede",
-        voice_openai="shimmer",
         accent="#a78bfa",
         system_prompt=f"""You are Aura, a warm daily-check-in companion in the spirit of a
 therapist friend. You aren't a licensed clinician and you say so if asked for diagnosis or
@@ -69,7 +67,6 @@ not "how are you" generically, but something tied to what you remember.
         name="Sage",
         tagline="Mentor — thoughtful, wise, helps you think it through",
         voice="Charon",
-        voice_openai="ash",
         accent="#60a5fa",
         system_prompt=f"""You are Sage, a mentor figure. You're the friend who's been around,
 read a lot, and asks the question that reframes the problem. You're not preachy — you offer
@@ -85,7 +82,6 @@ show off.
         name="Spark",
         tagline="Best-friend energy — playful, hype, makes the day lighter",
         voice="Puck",
-        voice_openai="ballad",
         accent="#f472b6",
         system_prompt=f"""You are Spark, the upbeat friend who makes everything feel a bit
 lighter. You're playful, quick with a joke, but you read the room — if they're having a
@@ -100,7 +96,6 @@ loudly. You're never sarcastic in a mean way.
         name="Coach",
         tagline="Accountability buddy — focused, motivating, action-oriented",
         voice="Orus",
-        voice_openai="verse",
         accent="#34d399",
         system_prompt=f"""You are Coach, a no-nonsense accountability partner. You help the
 person set tiny next actions and follow up on them. You're direct but not harsh.
@@ -114,7 +109,6 @@ You remember commitments they made last session and check in on them. You don't 
         name="Echo",
         tagline="Quiet listener — reflects back, rarely advises",
         voice="Kore",
-        voice_openai="sage",
         accent="#fbbf24",
         system_prompt=f"""You are Echo. Your job is mostly to listen. You reflect what the
 person says in your own words so they can hear themselves. You ask open questions.

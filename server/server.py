@@ -71,14 +71,9 @@ async def root() -> dict[str, str]:
 
 @app.get("/api/diag")
 async def diag() -> dict[str, Any]:
-    """Quick health-check across whichever backend is configured."""
-    backend = (os.environ.get("LLM_BACKEND") or "gemini").lower()
-    out: dict[str, Any] = {"backend": backend}
-
-    if backend == "openai":
-        out.update(_diag_openai())
-    else:
-        out.update(_diag_gemini())
+    """Quick health-check for the Gemini Live backend."""
+    out: dict[str, Any] = {"backend": "gemini"}
+    out.update(_diag_gemini())
 
     # Always show what the image-card fetcher will use.
     out["image_provider"] = (
@@ -123,38 +118,6 @@ def _diag_gemini() -> dict[str, Any]:
         return {"ok": False, "reason": str(e)}
 
 
-def _diag_openai() -> dict[str, Any]:
-    import json as _json
-    import urllib.error
-    import urllib.request
-
-    key = os.environ.get("OPENAI_API_KEY")
-    if not key:
-        return {"ok": False, "reason": "OPENAI_API_KEY missing in .env"}
-    try:
-        req = urllib.request.Request(
-            "https://api.openai.com/v1/models",
-            headers={"Authorization": f"Bearer {key}"},
-        )
-        with urllib.request.urlopen(req, timeout=10) as r:
-            data = _json.loads(r.read())
-        realtime = sorted(
-            m["id"] for m in data.get("data", []) if "realtime" in m["id"]
-        )
-        return {
-            "ok": True,
-            "key_prefix": key[:8] + "…",
-            "configured_model": os.environ.get(
-                "OPENAI_REALTIME_MODEL", "gpt-4o-mini-realtime-preview"
-            ),
-            "realtime_models_available_to_your_key": realtime,
-        }
-    except urllib.error.HTTPError as e:
-        return {"ok": False, "reason": f"OpenAI API rejected key: {e.code} {e.reason}"}
-    except Exception as e:  # noqa: BLE001
-        return {"ok": False, "reason": str(e)}
-
-
 @app.get("/api/personas")
 async def list_personas() -> list[dict[str, Any]]:
     return personas.list_personas()
@@ -175,10 +138,7 @@ async def clear_memory(user_id: str) -> dict[str, Any]:
 
 @app.post("/api/connect")
 async def connect(req: Request) -> dict[str, Any]:
-    backend = (os.environ.get("LLM_BACKEND") or "gemini").lower()
-    if backend == "openai" and not os.environ.get("OPENAI_API_KEY"):
-        raise HTTPException(500, "OPENAI_API_KEY not configured on server")
-    if backend != "openai" and not os.environ.get("GOOGLE_API_KEY"):
+    if not os.environ.get("GOOGLE_API_KEY"):
         raise HTTPException(500, "GOOGLE_API_KEY not configured on server")
 
     body = await req.json()

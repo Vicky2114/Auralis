@@ -26,15 +26,6 @@ from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
 from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService
 from pipecat.services.llm_service import LLMService
-from pipecat.services.openai.realtime.events import (
-    AudioConfiguration,
-    AudioInput,
-    AudioOutput,
-    InputAudioNoiseReduction,
-    SemanticTurnDetection,
-    SessionProperties,
-)
-from pipecat.services.openai.realtime.llm import OpenAIRealtimeLLMService
 from pipecat.transports.base_transport import TransportParams
 from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
 from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
@@ -121,61 +112,11 @@ FORGET_TOOL = FunctionSchema(
 
 
 def make_llm(persona, system_instruction: str, gemini_model: str) -> LLMService:
-    """Construct the right LLM service for the configured backend.
+    """Construct the Gemini Live LLM service for this persona.
 
-    Set LLM_BACKEND in .env to "gemini" (default) or "openai".
-
-    Both services implement the same LLMService base, so the rest of the
-    pipeline (context aggregator, function-calling, transport) is identical.
-    Only the voice + model strings differ — see persona.voice (Gemini) vs
-    persona.voice_openai.
+    The whole pipeline (context aggregator, function-calling, transport) is
+    backend-agnostic — only the model + voice strings come from here.
     """
-    backend = (os.environ.get("LLM_BACKEND") or "gemini").lower()
-
-    if backend == "openai":
-        api_key = os.environ.get("OPENAI_API_KEY")
-        if not api_key:
-            raise RuntimeError(
-                "LLM_BACKEND=openai but OPENAI_API_KEY is not set in .env"
-            )
-        model = (
-            os.environ.get("OPENAI_REALTIME_MODEL")
-            or "gpt-4o-mini-realtime-preview"
-        )
-        logger.info(f"[backend] OpenAI Realtime model={model} voice={persona.voice_openai}")
-        return OpenAIRealtimeLLMService(
-            api_key=api_key,
-            settings=OpenAIRealtimeLLMService.Settings(
-                model=model,
-                session_properties=SessionProperties(
-                    instructions=system_instruction,
-                    tools=build_tools(),
-                    audio=AudioConfiguration(
-                        # Server-side noise reduction blocks the echo / hum
-                        # that otherwise leaks back from speakers into the
-                        # mic and tricks server VAD into "user is talking".
-                        # Switch to "far_field" if you're on a laptop mic in
-                        # a noisy room rather than headphones.
-                        input=AudioInput(
-                            noise_reduction=InputAudioNoiseReduction(type="near_field"),
-                            # Semantic turn-detection uses an LLM to decide if
-                            # the user actually finished talking, instead of
-                            # just hitting a volume threshold + 500ms silence.
-                            # `eagerness=low` waits longer before committing,
-                            # which is what we want for natural conversation.
-                            turn_detection=SemanticTurnDetection(
-                                eagerness="low",
-                                interrupt_response=True,  # user CAN still interrupt deliberately
-                                create_response=True,
-                            ),
-                        ),
-                        output=AudioOutput(voice=persona.voice_openai),
-                    ),
-                ),
-            ),
-        )
-
-    # Default: Gemini Live
     logger.info(f"[backend] Gemini Live model={gemini_model} voice={persona.voice}")
     return GeminiLiveLLMService(
         api_key=os.environ["GOOGLE_API_KEY"],
