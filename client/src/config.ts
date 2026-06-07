@@ -12,14 +12,25 @@ export function apiUrl(path: string): string {
   return `${API_BASE}${path}`;
 }
 
-/** STUN/TURN servers for WebRTC. STUN is free; TURN relays media through NATs. */
+/** Split a comma/space-separated env value into a clean list of URLs. */
+function urlList(value: string | undefined): string[] {
+  return (value ?? "")
+    .split(/[,\s]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/** STUN/TURN servers for WebRTC. STUN is free; TURN relays media through NATs.
+ *  VITE_TURN_URL may hold MULTIPLE comma-separated URLs (udp/tcp/tls) for the
+ *  best chance of connecting through strict firewalls. */
 export function iceServers(): RTCIceServer[] {
   const servers: RTCIceServer[] = [];
-  const stun = import.meta.env.VITE_STUN_URL ?? "stun:stun.l.google.com:19302";
-  if (stun) servers.push({ urls: stun });
 
-  const turn = import.meta.env.VITE_TURN_URL;
-  if (turn) {
+  const stun = urlList(import.meta.env.VITE_STUN_URL ?? "stun:stun.l.google.com:19302");
+  if (stun.length) servers.push({ urls: stun });
+
+  const turn = urlList(import.meta.env.VITE_TURN_URL);
+  if (turn.length) {
     servers.push({
       urls: turn,
       username: import.meta.env.VITE_TURN_USERNAME,

@@ -53,11 +53,15 @@ def _ice_servers() -> list[IceServer]:
         TURN_USERNAME
         TURN_CREDENTIAL
     """
+    def _urls(value: str) -> list[str]:
+        # Allow multiple comma/space-separated URLs (udp/tcp/tls).
+        return [u for u in (value or "").replace(",", " ").split() if u]
+
     servers: list[IceServer] = []
-    stun = os.environ.get("STUN_URL", "stun:stun.l.google.com:19302").strip()
+    stun = _urls(os.environ.get("STUN_URL", "stun:stun.l.google.com:19302"))
     if stun:
         servers.append(IceServer(urls=stun))
-    turn = os.environ.get("TURN_URL", "").strip()
+    turn = _urls(os.environ.get("TURN_URL", ""))
     if turn:
         servers.append(
             IceServer(
