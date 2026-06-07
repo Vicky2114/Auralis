@@ -1,0 +1,61 @@
+name: CI
+
+# Runs the full keyless test suite + frontend build on every push to main
+# and every pull request. No secrets / API keys required — tests exercise the
+# HTTP API contract, memory/persona/model logic, and the client build.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server-tests:
+    name: Server tests (py${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.13"]
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python }}
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run tests (pytest + coverage)
+        env:
+          # Keep CI deterministic and keyless — exercise the no-key paths.
+          GOOGLE_API_KEY: ""
+          OPENAI_API_KEY: ""
+        run: uv run pytest -v --cov=. --cov-report=term-missing
+
+  client-build:
+    name: Client typecheck & build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck & build
+        run: npm run build
