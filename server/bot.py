@@ -218,7 +218,25 @@ question you don't know, use Google Search rather than guessing.
     llm.register_function("remember", handle_remember)
     llm.register_function("forget", handle_forget)
 
-    context = LLMContext()
+    # Seed an opening user turn so the model is GUARANTEED to greet first.
+    # An empty initial context doesn't work: Gemini Live extracts the system
+    # prompt out, leaving zero messages, and _create_initial_response() then
+    # early-returns without triggering any inference (no greeting). A real
+    # trailing user turn forces the first response. This message is context-only
+    # (not an ASR transcript), so it never shows up in the captions thread.
+    context = LLMContext(
+        messages=[
+            {
+                "role": "user",
+                "content": (
+                    "(The session just started. Greet me warmly to open the "
+                    "conversation — in Hindi by default, by name if you know it "
+                    "from memory, and tie it to something you remember about me "
+                    "when you can. Keep it short and natural.)"
+                ),
+            }
+        ]
+    )
     context_aggregator = LLMContextAggregatorPair(context)
 
     pipeline = Pipeline([

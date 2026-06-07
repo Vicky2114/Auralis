@@ -25,6 +25,11 @@ interface Options {
 export function useVoiceClient({ userId, personaId }: Options) {
   const clientRef = useRef<PipecatClient | null>(null);
   const audioElRef = useRef<HTMLAudioElement | null>(null);
+  // Web Audio analyser used to detect the agent's FIRST real audio directly
+  // from the bot's media stream — independent of (unreliable) RTVI speaking
+  // events. This is the authoritative "first audio from the agent" signal.
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const detectRafRef = useRef<number | null>(null);
   const [state, setState] = useState<ConnState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [thread, setThread] = useState<ThreadMessage[]>([]);
@@ -57,18 +62,78 @@ export function useVoiceClient({ userId, personaId }: Options) {
     return el;
   }, []);
 
+  const stopFirstAudioWatch = useCallback(() => {
+    if (detectRafRef.current != null) {
+      cancelAnimationFrame(detectRafRef.current);
+      detectRafRef.current = null;
+    }
+    if (audioCtxRef.current) {
+      void audioCtxRef.current.close().catch(() => {});
+      audioCtxRef.current = null;
+    }
+  }, []);
+
+  // Poll the bot stream's amplitude; the first time it carries real energy,
+  // the agent's audio is actually playing -> flip agentReady and stop watching.
+  const watchForFirstAudio = useCallback(
+    (stream: MediaStream) => {
+      try {
+        const AC =
+          window.AudioContext ||
+          (window as unknown as { webkitAudioContext?: typeof AudioContext })
+            .webkitAudioContext;
+        if (!AC) return;
+        stopFirstAudioWatch();
+        const ctx = new AC();
+        audioCtxRef.current = ctx;
+        // The context may start suspended; resume so the analyser actually
+        // processes samples (otherwise it reads silence forever).
+        if (ctx.state === "suspended") void ctx.resume().catch(() => {});
+        const source = ctx.createMediaStreamSource(stream);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 512;
+        // Connect to the analyser only (NOT to destination) — the hidden
+        // <audio> element handles playback, so this avoids double audio.
+        source.connect(analyser);
+        const buf = new Uint8Array(analyser.fftSize);
+        const tick = () => {
+          analyser.getByteTimeDomainData(buf);
+          let sum = 0;
+          for (let i = 0; i < buf.length; i++) {
+            const v = (buf[i] - 128) / 128;
+            sum += v * v;
+          }
+          const rms = Math.sqrt(sum / buf.length);
+          if (rms > 0.015) {
+            setAgentReady(true);
+            stopFirstAudioWatch();
+            return;
+          }
+          detectRafRef.current = requestAnimationFrame(tick);
+        };
+        detectRafRef.current = requestAnimationFrame(tick);
+      } catch (e) {
+        console.warn("[audio] first-audio analyser failed", e);
+      }
+    },
+    [stopFirstAudioWatch]
+  );
+
   const attachBotTrack = useCallback(
     (track: MediaStreamTrack) => {
       if (track.kind !== "audio") return;
       const el = ensureAudioEl();
-      el.srcObject = new MediaStream([track]);
+      const stream = new MediaStream([track]);
+      el.srcObject = stream;
       el.play().catch((err) => {
         // Autoplay can be blocked if connect() somehow ran without a user
         // gesture. Surface it so we can offer a "tap to play" fallback.
         console.warn("[audio] play() blocked:", err);
       });
+      // Start listening for the agent's first audio on this stream.
+      watchForFirstAudio(stream);
     },
-    [ensureAudioEl]
+    [ensureAudioEl, watchForFirstAudio]
   );
 
   // We stitch streaming partials into one bubble per turn, keyed by role+turn.
@@ -202,6 +267,7 @@ export function useVoiceClient({ userId, personaId }: Options) {
   }, [userId, personaId, appendOrUpdate]);
 
   const disconnect = useCallback(async () => {
+    stopFirstAudioWatch();
     const c = clientRef.current;
     clientRef.current = null;
     if (c) {
@@ -218,7 +284,7 @@ export function useVoiceClient({ userId, personaId }: Options) {
     }
     setAgentReady(false);
     setState("idle");
-  }, []);
+  }, [stopFirstAudioWatch]);
 
   const clearThread = useCallback(() => {
     setThread([]);
