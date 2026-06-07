@@ -1,0 +1,26 @@
+# Render Blueprint — deploys the Auralis backend (Docker) on the free tier.
+# In Render: New + > Blueprint > pick this repo. It reads server/Dockerfile.
+services:
+  - type: web
+    name: auralis-api
+    runtime: docker
+    rootDir: server
+    dockerfilePath: ./Dockerfile
+    region: singapore       # closest free region to India (also: frankfurt, oregon)
+    plan: free
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: "7860"
+      # Set these in the Render dashboard (marked sync:false = not in git):
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: GEMINI_LIVE_MODEL
+        value: models/gemini-3.1-flash-live-preview
+      - key: TURN_URL
+        sync: false
+      - key: TURN_USERNAME
+        sync: false
+      - key: TURN_CREDENTIAL
+        sync: false

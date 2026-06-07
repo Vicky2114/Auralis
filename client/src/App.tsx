@@ -6,6 +6,7 @@ import ConversationThread from "./components/ConversationThread";
 import MemoryPanel from "./components/MemoryPanel";
 import { DEFAULT_PERSONAS, type Persona } from "./personas";
 import { useVoiceClient } from "./hooks/useVoiceClient";
+import { apiUrl } from "./config";
 
 const USER_ID_KEY = "aura.userId";
 const PERSONA_KEY = "aura.persona";
@@ -31,7 +32,7 @@ export default function App() {
   const userId = useMemo(getOrMakeUserId, []);
 
   useEffect(() => {
-    fetch("/api/personas")
+    fetch(apiUrl("/api/personas"))
       .then((r) => r.json())
       .then((data: Persona[]) => {
         if (Array.isArray(data) && data.length) setPersonas(data);

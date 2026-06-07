@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { apiUrl } from "../config";
 
 interface Fact {
   fact: string;
@@ -19,7 +20,7 @@ export default function MemoryPanel({ userId, refreshKey }: Props) {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetch(`/api/memory/${encodeURIComponent(userId)}`)
+    fetch(apiUrl(`/api/memory/${encodeURIComponent(userId)}`))
       .then((r) => r.json())
       .then((d) => {
         if (!cancelled) setFacts(d.facts ?? []);
@@ -33,7 +34,7 @@ export default function MemoryPanel({ userId, refreshKey }: Props) {
 
   const clearAll = async () => {
     if (!confirm("Erase everything your buddy remembers about you?")) return;
-    await fetch(`/api/memory/${encodeURIComponent(userId)}`, { method: "DELETE" });
+    await fetch(apiUrl(`/api/memory/${encodeURIComponent(userId)}`), { method: "DELETE" });
     setFacts([]);
   };
 

@@ -23,7 +23,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
-from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
+from pipecat.transports.smallwebrtc.connection import IceServer, SmallWebRTCConnection
 from pipecat.transports.smallwebrtc.request_handler import (
     ConnectionMode,
     IceCandidate,
@@ -41,7 +41,39 @@ import personas
 load_dotenv(override=True)
 
 
-webrtc_handler = SmallWebRTCRequestHandler(connection_mode=ConnectionMode.MULTIPLE)
+def _ice_servers() -> list[IceServer]:
+    """STUN/TURN for WebRTC NAT traversal.
+
+    On localhost no ICE servers are needed. Across the public internet you need
+    STUN (cheap, just discovers your public IP) and almost always TURN (relays
+    media when peers are behind strict NATs). Configure via env:
+
+        STUN_URL          (default: Google's public STUN)
+        TURN_URL          e.g. turn:turn.example.com:3478
+        TURN_USERNAME
+        TURN_CREDENTIAL
+    """
+    servers: list[IceServer] = []
+    stun = os.environ.get("STUN_URL", "stun:stun.l.google.com:19302").strip()
+    if stun:
+        servers.append(IceServer(urls=stun))
+    turn = os.environ.get("TURN_URL", "").strip()
+    if turn:
+        servers.append(
+            IceServer(
+                urls=turn,
+                username=os.environ.get("TURN_USERNAME") or None,
+                credential=os.environ.get("TURN_CREDENTIAL") or None,
+            )
+        )
+    logger.info(f"ICE servers configured: {[s.urls for s in servers]}")
+    return servers
+
+
+webrtc_handler = SmallWebRTCRequestHandler(
+    connection_mode=ConnectionMode.MULTIPLE,
+    ice_servers=_ice_servers(),
+)
 
 
 @asynccontextmanager

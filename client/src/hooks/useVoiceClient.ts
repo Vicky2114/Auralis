@@ -6,6 +6,7 @@ import {
   type TranscriptData,
 } from "@pipecat-ai/client-js";
 import { SmallWebRTCTransport } from "@pipecat-ai/small-webrtc-transport";
+import { apiUrl, iceServers } from "../config";
 
 export type ConnState = "idle" | "connecting" | "connected" | "error";
 
@@ -167,8 +168,9 @@ export function useVoiceClient({ userId, personaId }: Options) {
 
     try {
       const transport = new SmallWebRTCTransport({
+        iceServers: iceServers(),
         webrtcRequestParams: {
-          endpoint: "/api/connect",
+          endpoint: apiUrl("/api/connect"),
           requestData: { user_id: userId, persona_id: personaId },
         },
       });

@@ -1,0 +1,39 @@
+# Fly.io config for the Auralis backend.
+# Deploy from the server/ directory:  fly deploy
+# (Rename `app` if "auralis-api" is taken — fly launch will prompt.)
+
+app = "auralis-api"
+primary_region = "bom"   # Mumbai — closest to the Indian audience
+
+[build]
+
+[env]
+  HOST = "0.0.0.0"
+  PORT = "7860"
+  # STUN default is baked into the app; set TURN_* via `fly secrets set`.
+
+[http_service]
+  internal_port = 7860
+  force_https = true
+  # Voice sessions are stateful and long-lived — keep one machine warm so a
+  # call is never killed by scale-to-zero (and no cold-start drop on connect).
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "20s"
+    method = "GET"
+    path = "/"
+
+# Persist the JSON memory store across deploys/restarts. The app writes to
+# /app/data/memory (memory.DATA_DIR), so mount the volume at /app/data.
+[mounts]
+  source = "auralis_data"
+  destination = "/app/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"   # Pipecat + Silero VAD + aiortc need headroom
