@@ -1,36 +1,33 @@
-"""FastAPI signaling server.
+"""FastAPI server.
 
 Exposes:
   GET    /api/personas           -> list available personas (id, name, tagline, accent)
   GET    /api/memory/{uid}       -> dump memory facts for a user
   DELETE /api/memory/{uid}       -> clear all memory for a user
-  POST   /api/connect            -> WebRTC offer; spawns a Pipecat bot per peer
-  PATCH  /api/connect            -> ICE candidate trickle for an existing pc
+  POST   /api/connect            -> create a Daily room + token, spawn a bot in it
   GET    /                       -> health check
 
-In dev, run alongside the Vite client (CORS is permissive).
+Uses Daily as the WebRTC transport: Daily hosts the media (TURN included), so
+this server only creates rooms and orchestrates the bot. In dev, run alongside
+the Vite client (CORS is permissive).
 """
 
 from __future__ import annotations
 
 import asyncio
 import os
-from contextlib import asynccontextmanager
+import time
 from typing import Any
 
+import aiohttp
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
-from pipecat.transports.smallwebrtc.connection import IceServer, SmallWebRTCConnection
-from pipecat.transports.smallwebrtc.request_handler import (
-    ConnectionMode,
-    IceCandidate,
-    SmallWebRTCPatchRequest,
-    SmallWebRTCRequest,
-    SmallWebRTCRequestHandler,
-)
+# NOTE: pipecat.transports.daily.utils is imported lazily inside connect() —
+# it pulls daily-python (no Windows wheel), so a top-level import would break
+# module load (and tests) on Windows dev machines.
 
 import bot as bot_module
 import memory
@@ -40,54 +37,10 @@ import personas
 # env vars (e.g. a leftover GOOGLE_API_KEY in the OS environment shadowing it).
 load_dotenv(override=True)
 
+DAILY_API_KEY = os.environ.get("DAILY_API_KEY", "")
+DAILY_API_URL = os.environ.get("DAILY_API_URL", "https://api.daily.co/v1")
 
-def _ice_servers() -> list[IceServer]:
-    """STUN/TURN for WebRTC NAT traversal.
-
-    On localhost no ICE servers are needed. Across the public internet you need
-    STUN (cheap, just discovers your public IP) and almost always TURN (relays
-    media when peers are behind strict NATs). Configure via env:
-
-        STUN_URL          (default: Google's public STUN)
-        TURN_URL          e.g. turn:turn.example.com:3478
-        TURN_USERNAME
-        TURN_CREDENTIAL
-    """
-    def _urls(value: str) -> list[str]:
-        # Allow multiple comma/space-separated URLs (udp/tcp/tls).
-        return [u for u in (value or "").replace(",", " ").split() if u]
-
-    servers: list[IceServer] = []
-    stun = _urls(os.environ.get("STUN_URL", "stun:stun.l.google.com:19302"))
-    if stun:
-        servers.append(IceServer(urls=stun))
-    turn = _urls(os.environ.get("TURN_URL", ""))
-    if turn:
-        servers.append(
-            IceServer(
-                urls=turn,
-                username=os.environ.get("TURN_USERNAME") or None,
-                credential=os.environ.get("TURN_CREDENTIAL") or None,
-            )
-        )
-    logger.info(f"ICE servers configured: {[s.urls for s in servers]}")
-    return servers
-
-
-webrtc_handler = SmallWebRTCRequestHandler(
-    connection_mode=ConnectionMode.MULTIPLE,
-    ice_servers=_ice_servers(),
-)
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    yield
-    logger.info("Shutting down — closing peer connections")
-    await webrtc_handler.close()
-
-
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
@@ -176,44 +129,50 @@ async def clear_memory(user_id: str) -> dict[str, Any]:
 
 @app.post("/api/connect")
 async def connect(req: Request) -> dict[str, Any]:
+    """Create a short-lived Daily room + tokens, spawn the bot, return room+token.
+
+    The Pipecat JS client (DailyTransport) posts here and expects
+    {"room_url": ..., "token": ...} so it can join the same room as the bot.
+    """
     if not os.environ.get("GOOGLE_API_KEY"):
         raise HTTPException(500, "GOOGLE_API_KEY not configured on server")
+    if not DAILY_API_KEY:
+        raise HTTPException(500, "DAILY_API_KEY not configured on server")
+
+    from pipecat.transports.daily.utils import (
+        DailyRESTHelper,
+        DailyRoomParams,
+        DailyRoomProperties,
+    )
 
     body = await req.json()
-    pipecat_request = SmallWebRTCRequest.from_dict(body)
-    data = pipecat_request.request_data or {}
+    data = body.get("requestData") or body.get("request_data") or {}
     user_id = str(data.get("user_id") or "anon")
     persona_id = str(data.get("persona_id") or "aura")
 
-    async def on_new_connection(pc: SmallWebRTCConnection) -> None:
-        # Spawn the bot once the connection is initialized. It will run for
-        # the lifetime of the peer connection.
-        asyncio.create_task(bot_module.run_bot(pc, user_id, persona_id))
-
-    answer = await webrtc_handler.handle_web_request(pipecat_request, on_new_connection)
-    if answer is None:
-        raise HTTPException(500, "No answer produced for offer")
-    return answer
-
-
-@app.patch("/api/connect")
-async def patch_connection(req: Request) -> dict[str, str]:
-    body = await req.json()
-    pc_id = body.get("pc_id")
-    if not pc_id:
-        raise HTTPException(400, "pc_id required")
-    candidates = [
-        IceCandidate(
-            candidate=c["candidate"],
-            sdp_mid=c.get("sdp_mid") or c.get("sdpMid"),
-            sdp_mline_index=c.get("sdp_mline_index") or c.get("sdpMLineIndex") or 0,
+    async with aiohttp.ClientSession() as session:
+        helper = DailyRESTHelper(
+            daily_api_key=DAILY_API_KEY,
+            daily_api_url=DAILY_API_URL,
+            aiohttp_session=session,
         )
-        for c in body.get("candidates", [])
-    ]
-    await webrtc_handler.handle_patch_request(
-        SmallWebRTCPatchRequest(pc_id=pc_id, candidates=candidates)
-    )
-    return {"ok": "true"}
+        # Ephemeral room: auto-expires in 1h and ejects participants then.
+        room = await helper.create_room(
+            DailyRoomParams(
+                properties=DailyRoomProperties(
+                    exp=time.time() + 60 * 60,
+                    eject_at_room_exp=True,
+                    enable_prejoin_ui=False,
+                )
+            )
+        )
+        bot_token = await helper.get_token(room.url, expiry_time=60 * 60, owner=True)
+        client_token = await helper.get_token(room.url, expiry_time=60 * 60, owner=False)
+
+    # Spawn the bot into the room; it runs for the lifetime of the call.
+    asyncio.create_task(bot_module.run_bot(room.url, bot_token, user_id, persona_id))
+
+    return {"room_url": room.url, "token": client_token}
 
 
 def main() -> None:

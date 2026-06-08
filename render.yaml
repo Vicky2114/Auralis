@@ -18,9 +18,6 @@ services:
         sync: false
       - key: GEMINI_LIVE_MODEL
         value: models/gemini-3.1-flash-live-preview
-      - key: TURN_URL
-        sync: false
-      - key: TURN_USERNAME
-        sync: false
-      - key: TURN_CREDENTIAL
+      # Daily hosts the WebRTC media (TURN included) — no separate TURN needed.
+      - key: DAILY_API_KEY
         sync: false

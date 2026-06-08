@@ -26,9 +26,9 @@ from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
 from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService
 from pipecat.services.llm_service import LLMService
-from pipecat.transports.base_transport import TransportParams
-from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
-from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
+# NOTE: pipecat.transports.daily is imported lazily inside _run_bot_inner —
+# it pulls daily-python, which has no Windows wheel. Keeping the import lazy
+# lets the module load (and tests run) on Windows dev machines.
 
 import memory
 import personas
@@ -149,21 +149,17 @@ def build_tools() -> ToolsSchema:
 
 # --- Bot entrypoint --------------------------------------------------------
 
-async def run_bot(webrtc_connection: SmallWebRTCConnection, user_id: str, persona_id: str) -> None:
+async def run_bot(room_url: str, token: str, user_id: str, persona_id: str) -> None:
     try:
-        await _run_bot_inner(webrtc_connection, user_id, persona_id)
+        await _run_bot_inner(room_url, token, user_id, persona_id)
     except Exception:
         # Without this, errors inside the spawned task vanish silently —
-        # the WebRTC connection is up but the bot never speaks.
+        # the bot joins the room but never speaks.
         logger.exception(f"Bot crashed for user={user_id} persona={persona_id}")
-        try:
-            await webrtc_connection.disconnect()
-        except Exception:  # noqa: BLE001
-            pass
 
 
 async def _run_bot_inner(
-    webrtc_connection: SmallWebRTCConnection, user_id: str, persona_id: str
+    room_url: str, token: str, user_id: str, persona_id: str
 ) -> None:
     persona = personas.get(persona_id)
     model_name, model_source = resolve_gemini_model()
@@ -187,9 +183,13 @@ If they ask you to forget something, call `forget`. If they ask a factual
 question you don't know, use Google Search rather than guessing.
 """
 
-    transport = SmallWebRTCTransport(
-        webrtc_connection=webrtc_connection,
-        params=TransportParams(
+    from pipecat.transports.daily.transport import DailyParams, DailyTransport
+
+    transport = DailyTransport(
+        room_url,
+        token,
+        "Auralis",
+        params=DailyParams(
             audio_in_enabled=True,
             audio_out_enabled=True,
             vad_analyzer=SileroVADAnalyzer(),
@@ -255,15 +255,15 @@ question you don't know, use Google Search rather than guessing.
         ),
     )
 
-    @transport.event_handler("on_client_connected")
-    async def _on_connected(_t, _client):
-        logger.info("Client connected — kicking off greeting")
+    @transport.event_handler("on_first_participant_joined")
+    async def _on_joined(_transport, _participant):
+        logger.info("User joined — kicking off greeting")
         # Nudge the model to speak first so the user hears the persona right away.
         await task.queue_frames([LLMRunFrame()])
 
-    @transport.event_handler("on_client_disconnected")
-    async def _on_disconnected(_t, _client):
-        logger.info("Client disconnected")
+    @transport.event_handler("on_participant_left")
+    async def _on_left(_transport, _participant, _reason):
+        logger.info("User left — ending session")
         await task.queue_frames([EndFrame()])
 
     runner = PipelineRunner(handle_sigint=False)
