@@ -1,84 +1,90 @@
 # Deploying Auralis (no credit card)
 
-- **Backend** (FastAPI + Pipecat) → **Render** free tier (Docker)
+- **Backend** (FastAPI + Pipecat + WebRTC) → **Render** free tier (Docker)
 - **Client** (Vite/React) → **Vercel** (static)
-- **WebRTC media** → **Daily** (free tier; TURN/STUN included — no separate TURN setup)
+- **TURN** (WebRTC media relay) → **Metered.ca** free tier (email signup, no card)
 
-Order: **Daily API key → Backend (Render) → Frontend (Vercel)**.
+Order: **TURN creds → Backend (Render) → Frontend (Vercel)**.
 
-> **Why Daily:** Daily hosts the audio/video media on its own global infra
-> (TURN included), so it works on Render (no public UDP needed) **and** the
-> heavy WebRTC work is off your tiny Render box — which is what makes
-> **multiple users** hold up far better than self-hosted WebRTC.
-
-> **Free-tier caveats (Render):** sleeps after ~15 min idle (first connect may
-> need a retry while it wakes), 512 MB RAM, no persistent disk (memory resets
-> on restart). Daily free tier: ~10,000 participant-minutes/month.
-
-> **Local dev note:** `daily-python` has **no Windows wheel**, so the backend
-> can't run on Windows directly. Use Render for testing, or run the backend in
-> **WSL / macOS / Linux**. The client and tests still work on Windows.
+> **Free-tier caveats (Render):**
+> - Service **sleeps after ~15 min idle** and takes ~1 min to wake — the first
+>   connect after idle may time out; just retry once it's awake.
+> - **512 MB RAM** is tight for the audio pipeline; if it crashes (OOM) you'd
+>   need a paid instance.
+> - **No persistent disk** on free — the memory store resets on restart/redeploy.
 
 ---
 
-## 1. Daily API key (free, no card)
+## 1. TURN credentials (Metered.ca — free, no card)
 
-1. Sign up at **https://dashboard.daily.co/** (free).
-2. Go to **Developers** → copy your **API key**.
-
-That's the only credential Daily needs — it handles rooms/tokens/TURN for you.
+1. Sign up at **https://www.metered.ca/** (email only).
+2. Dashboard → **TURN Server** → copy:
+   ```
+   TURN_URL          e.g. turn:standard.relay.metered.ca:80
+   TURN_USERNAME
+   TURN_CREDENTIAL
+   ```
 
 ---
 
 ## 2. Backend on Render
 
-1. Repo is on GitHub (`Vicky2114/Auralis`).
-2. **render.com** → **New + → Blueprint** → pick the repo (reads `render.yaml` + `server/Dockerfile`).
-3. Set the secret env vars (`sync:false`, not in git):
+1. Make sure the repo is pushed to GitHub (it is: `Vicky2114/Auralis`).
+2. **render.com** → sign up (GitHub login, no card) → **New + → Blueprint**.
+3. Pick the `Auralis` repo. Render reads `render.yaml` and the `server/Dockerfile`.
+4. Set the secret env vars when prompted (these are `sync:false`, not in git):
 
    | Key | Value |
    |---|---|
    | `GOOGLE_API_KEY` | your working Google key |
-   | `DAILY_API_KEY` | from the Daily dashboard |
+   | `TURN_URL` | from Metered |
+   | `TURN_USERNAME` | from Metered |
+   | `TURN_CREDENTIAL` | from Metered |
 
-   (`GEMINI_LIVE_MODEL` and `PORT` are already in `render.yaml`.)
-4. **Create** → Docker build + deploy (~5–10 min) → URL like `https://auralis-api.onrender.com`.
-5. Check `/` → `{"status":"ok"}` and `/api/diag` → `ok:true`.
+   (`GEMINI_LIVE_MODEL` and `PORT` are already set in `render.yaml`.)
+5. **Create** → wait for the Docker build + deploy (first build is slow, ~5–10 min).
+6. You get a URL like `https://auralis-api.onrender.com`. Open `/` → `{"status":"ok"}`,
+   and `/api/diag` should show `ok:true`.
 
 ---
 
 ## 3. Frontend on Vercel
 
-1. **vercel.com** → import the repo.
-2. **Root Directory = `client`** (Vite auto-detected; `client/vercel.json` handles the build).
-3. **Environment Variable** (Production + Preview):
+1. **vercel.com** → sign up (GitHub login, no card) → **Add New → Project** →
+   import `Vicky2114/Auralis`.
+2. **Root Directory: leave as repo root** (root `vercel.json` builds the client).
+3. **Environment Variables** (Production + Preview):
 
    | Name | Value |
    |---|---|
    | `VITE_API_BASE` | `https://auralis-api.onrender.com` |
+   | `VITE_TURN_URL` | from Metered |
+   | `VITE_TURN_USERNAME` | from Metered |
+   | `VITE_TURN_CREDENTIAL` | from Metered |
 
-   (No TURN vars needed anymore — Daily handles media.)
 4. **Deploy.**
 
-> Vite inlines `VITE_*` at build time — redeploy after changing env vars.
+> Vite inlines `VITE_*` vars at **build time** — after changing any, **redeploy**.
 
 ---
 
 ## 4. Verify
 
-1. Wake the Render backend (open its `/` URL).
-2. Open the Vercel URL → tap the orb → allow mic.
-3. Expect: **Connecting → Preparing → greeting → Live** — and now it should hold
-   up with **two devices** at once.
-4. If it sticks: Render **Logs** (Daily room creation / Gemini `1011` quota) and
-   the browser console.
+1. Open the Vercel URL (wake the Render backend first by visiting its `/` URL —
+   it may be asleep).
+2. Tap the orb → allow mic.
+3. Expect: **Connecting → Preparing → greeting → Live**.
+4. If it sticks:
+   - Render **Logs** for backend errors / `1011` (Gemini quota).
+   - Browser console for ICE errors → TURN creds wrong/missing.
 
 ---
 
 ## Updating later
-- Backend: push to `main` → Render auto-deploys.
+- Backend: push to `main` → Render auto-deploys (`autoDeploy: true`).
 - Frontend: push to `main` → Vercel auto-deploys.
 
 ## If you outgrow the free tier
-Render free (512 MB / cold starts) still limits concurrency. Bump to a paid
-Render instance (more RAM/CPU) or any Docker host — `server/Dockerfile` is portable.
+512 MB / cold starts hurt voice UX. Options: Render paid instance ($7/mo, no
+sleep, more RAM), or Fly.io (needs a card but has a free allowance and keeps a
+machine warm). The `server/Dockerfile` works on any of them.

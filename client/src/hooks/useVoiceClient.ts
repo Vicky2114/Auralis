@@ -5,8 +5,8 @@ import {
   type BotLLMTextData,
   type TranscriptData,
 } from "@pipecat-ai/client-js";
-import { DailyTransport } from "@pipecat-ai/daily-transport";
-import { apiUrl } from "../config";
+import { SmallWebRTCTransport } from "@pipecat-ai/small-webrtc-transport";
+import { apiUrl, iceServers } from "../config";
 
 export type ConnState = "idle" | "connecting" | "connected" | "error";
 
@@ -167,10 +167,13 @@ export function useVoiceClient({ userId, personaId }: Options) {
     setState("connecting");
 
     try {
-      // Daily hosts the WebRTC media (TURN included). The server creates a
-      // room on /api/connect and returns { room_url, token }; the transport
-      // joins it.
-      const transport = new DailyTransport();
+      const transport = new SmallWebRTCTransport({
+        iceServers: iceServers(),
+        webrtcRequestParams: {
+          endpoint: apiUrl("/api/connect"),
+          requestData: { user_id: userId, persona_id: personaId },
+        },
+      });
 
       const client = new PipecatClient({
         transport,
@@ -255,11 +258,8 @@ export function useVoiceClient({ userId, personaId }: Options) {
 
       clientRef.current = client;
 
-      // Posts to /api/connect, receives { room_url, token }, joins the room.
-      await client.connect({
-        endpoint: apiUrl("/api/connect"),
-        requestData: { user_id: userId, persona_id: personaId },
-      });
+      // Connection params already live on the transport — connect() picks them up.
+      await client.connect();
     } catch (e) {
       console.error(e);
       setError(e instanceof Error ? e.message : String(e));

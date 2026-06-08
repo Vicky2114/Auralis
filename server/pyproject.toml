@@ -9,10 +9,6 @@ authors = [
 ]
 dependencies = [
     "pipecat-ai[google,silero,webrtc]>=0.0.90",
-    # daily-python has no Windows wheel — install the Daily extra only on
-    # Linux/macOS (CI + Render). Local Windows dev still resolves/tests fine;
-    # the Daily code paths are lazy-imported so they're only needed at runtime.
-    "pipecat-ai[daily]>=0.0.90 ; sys_platform != 'win32'",
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
     "python-dotenv>=1.0",

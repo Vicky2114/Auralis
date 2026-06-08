@@ -50,15 +50,12 @@ def test_diag_without_key(client):  # TC-API-06
     assert body["image_provider"] == "wikipedia"
 
 
-def test_connect_requires_google_key(client):  # TC-API-07
+def test_connect_requires_key(client):  # TC-API-07
     # No GOOGLE_API_KEY configured -> server refuses to spin up a bot.
     r = client.post("/api/connect", json={})
     assert r.status_code == 500
 
 
-def test_connect_requires_daily_key(client, monkeypatch):  # TC-API-08
-    # With a Google key present but no DAILY_API_KEY, connect still 500s.
-    monkeypatch.setenv("GOOGLE_API_KEY", "test-key")
-    r = client.post("/api/connect", json={})
-    assert r.status_code == 500
-    assert "DAILY" in r.json()["detail"]
+def test_patch_requires_pc_id(client):  # TC-API-08
+    r = client.patch("/api/connect", json={})
+    assert r.status_code == 400
